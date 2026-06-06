@@ -1,0 +1,4 @@
+com.posturebot.app.test.app-androidTest-0 C:\Users\a\Documents\ASEP2_Project\app_posture_bot\app\build\generated\res\resValues\androidTest\debug
+com.posturebot.app.test.app-mergeDebugAndroidTestResources-1 C:\Users\a\Documents\ASEP2_Project\app_posture_bot\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.posturebot.app.test.app-mergeDebugAndroidTestResources-2 C:\Users\a\Documents\ASEP2_Project\app_posture_bot\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.posturebot.app.test.app-debugAndroidTest-3 C:\Users\a\Documents\ASEP2_Project\app_posture_bot\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources

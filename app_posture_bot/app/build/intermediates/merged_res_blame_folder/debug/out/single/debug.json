@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.posturebot.app-merged_res-63:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.posturebot.app-main-65:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.posturebot.app-merged_res-63:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.posturebot.app-main-65:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.posturebot.app-merged_res-63:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.posturebot.app-main-65:/mipmap-anydpi-v26/ic_launcher.xml"
+    }
+]

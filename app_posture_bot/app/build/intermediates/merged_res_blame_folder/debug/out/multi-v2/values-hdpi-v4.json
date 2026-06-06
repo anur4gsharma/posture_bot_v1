@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.posturebot.app-mergeDebugResources-61:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\a\\.gradle\\caches\\8.13\\transforms\\a56a3e60a1db690d8f09a2b6a07f2a29\\transformed\\appcompat-1.7.0\\res\\values-hdpi-v4\\values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}
