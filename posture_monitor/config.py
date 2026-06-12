@@ -2,21 +2,30 @@
 config.py — Centralized configuration for the posture monitoring system.
 ==========================================================================
 All tuneable parameters live here. Change these values to adjust
-webcam source, serial port, detection sensitivity, and server settings.
+webcam source, serial ports, detection sensitivity, and server settings.
+
+Hardware layout:
+  - Arduino UNO  → TFT 2.4" ILI9341 shield (emoji faces)
+  - Arduino Nano → 16x2 I2C LCD + active buzzer (text messages + alert)
 """
 
 # ======================== WEBCAM ========================
 # USB Webcam index (0 = default camera, 1+ for additional cameras)
 WEBCAM_INDEX = 0
 
-# ======================== SERIAL (ESP32) ========================
-# Serial port for the ESP32 output controller (buzzer + TFT)
-# Windows: "COM3", "COM4", etc.  Linux/Mac: "/dev/ttyUSB0"
-SERIAL_PORT = "COM3"
-SERIAL_BAUD = 115200
+# ======================== SERIAL (Dual Arduino) ========================
+# Arduino UNO — TFT 2.4" display
+# Find your port in Device Manager → Ports (COM & LPT)
+SERIAL_PORT_UNO = "COM3"
+SERIAL_BAUD_UNO = 9600
+
+# Arduino Nano — LCD 16x2 + Buzzer
+SERIAL_PORT_NANO = "COM4"
+SERIAL_BAUD_NANO = 9600
 
 # Set False to run without serial (display-only mode)
-ENABLE_SERIAL = True
+ENABLE_SERIAL_UNO = True
+ENABLE_SERIAL_NANO = True
 
 # Minimum interval between serial commands (seconds) to avoid flooding
 SERIAL_INTERVAL = 0.3
@@ -26,8 +35,11 @@ SERIAL_INTERVAL = 0.3
 CALIBRATION_SECONDS = 5
 
 # ======================== POSTURE DETECTION ========================
-# Number of consecutive bad-posture frames before triggering persistent ALERT
-ALERT_THRESHOLD = 30
+# --- Sliding Window Bad-Posture Rule ---
+# The buzzer only activates when posture has been bad for at least
+# BAD_POSTURE_THRESHOLD seconds within the last BAD_POSTURE_WINDOW seconds.
+BAD_POSTURE_WINDOW = 30      # Rolling window size in seconds
+BAD_POSTURE_THRESHOLD = 25   # Seconds of bad posture required to trigger buzzer
 
 # Threshold multipliers (relative to calibrated baseline)
 # Higher = more tolerant.  Lower = stricter.

@@ -1,1 +1,1 @@
-# hardware — Serial communication with ESP32 output controller
+# hardware — Dual serial communication with Arduino UNO (TFT) + Nano (LCD+Buzzer)
