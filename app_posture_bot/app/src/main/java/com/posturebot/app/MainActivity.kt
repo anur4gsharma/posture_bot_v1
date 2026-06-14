@@ -30,6 +30,7 @@ import com.posturebot.app.data.db.PostureDao
 import com.posturebot.app.ui.screens.HistoryScreen
 import com.posturebot.app.ui.screens.LiveSessionScreen
 import com.posturebot.app.ui.screens.SessionDetailScreen
+import com.posturebot.app.ui.screens.SessionReportScreen
 import com.posturebot.app.ui.screens.WelcomeScreen
 import com.posturebot.app.ui.theme.PostureBotTheme
 import com.posturebot.app.viewmodel.SessionViewModel
@@ -64,8 +65,10 @@ class MainActivity : ComponentActivity() {
 
                     Scaffold(
                         bottomBar = {
-                            // Hide bottom bar on the welcome and detail screens
-                            if (currentRoute != "welcome" && !currentRoute.startsWith("session_detail")) {
+                            // Hide bottom bar on the welcome, report, and detail screens
+                            if (currentRoute != "welcome" &&
+                                currentRoute != "report" &&
+                                !currentRoute.startsWith("session_detail")) {
                                 NavigationBar {
                                     NavigationBarItem(
                                         icon = { Icon(Icons.Default.Favorite, contentDescription = "Live") },
@@ -102,8 +105,8 @@ class MainActivity : ComponentActivity() {
                         ) {
                             composable("welcome") {
                                 WelcomeScreen(
-                                    onStartCalibration = { serverUrl ->
-                                        viewModel.beginCalibration(serverUrl)
+                                    onConnect = { serverUrl ->
+                                        viewModel.connectToBackend(serverUrl)
                                         navController.navigate("live") {
                                             popUpTo("welcome") { inclusive = true }
                                         }
@@ -131,16 +134,40 @@ class MainActivity : ComponentActivity() {
                                         // Calibration auto-completes from Python backend
                                         // This button is a UX confirmation
                                     },
-                                    onStopMonitoring = {
-                                        viewModel.stopMonitoring()
+                                    onStopAnalyzing = {
+                                        viewModel.stopAndShowReport()
+                                        navController.navigate("report") {
+                                            popUpTo("live") { inclusive = true }
+                                        }
                                     },
                                     onStartCalibration = {
                                         viewModel.requestCalibration()
                                     },
                                     onReconnect = {
                                         viewModel.reconnect()
+                                    },
+                                    onGoBackToCalibration = {
+                                        viewModel.goBackToCalibration()
+                                        navController.navigate("welcome") {
+                                            popUpTo(0) { inclusive = true }
+                                        }
                                     }
                                 )
+                            }
+                            composable("report") {
+                                val report by viewModel.sessionReport.collectAsState()
+
+                                report?.let { sessionReport ->
+                                    SessionReportScreen(
+                                        report = sessionReport,
+                                        onReturnToHome = {
+                                            viewModel.goBackToCalibration()
+                                            navController.navigate("welcome") {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
                             }
                             composable("history") {
                                 val sessions by dao.getAllSessions()

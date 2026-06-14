@@ -43,19 +43,19 @@ BAD_POSTURE_THRESHOLD = 25   # Seconds of bad posture required to trigger buzzer
 
 # Threshold multipliers (relative to calibrated baseline)
 # Higher = more tolerant.  Lower = stricter.
-FORWARD_MULTIPLIER = 1.35       # forward head distance ratio
+# FORWARD_MULTIPLIER removed — forward head check is redundant with SLOUCHING
 SLOPE_OFFSET = 0.15             # shoulder slope absolute offset
 TILT_OFFSET = 15.0              # head tilt degrees offset
 NOSE_SHOULDER_MULTIPLIER = 0.65 # nose-to-shoulder ratio (lower = stricter)
-TORSO_MULTIPLIER = 0.90         # torso length ratio (lower = stricter)
+SHOULDER_DROP_TOLERANCE = 15    # max pixels a shoulder can drop below baseline
 
 # Default baseline if no person detected during calibration
 DEFAULT_BASELINE = {
-    'forward': 0.75,
     'slope': 0.08,
     'tilt': 5.0,
     'nose_shoulder': 0.7,
-    'torso': 1.5,
+    'shoulder_y_left': 200,
+    'shoulder_y_right': 200,
 }
 
 # ======================== WEBSOCKET SERVER ========================

@@ -5,11 +5,12 @@ These functions have ZERO external dependencies (no OpenCV, no MediaPipe).
 They take simple (x, y) tuples and return numbers.
 
 Metrics computed:
-  - forward:       How far the nose is from the shoulder center (normalized)
-  - slope:         How tilted the shoulders are (left vs right)
-  - tilt:          How much the head is tilted sideways (ear alignment)
-  - nose_shoulder: Perpendicular distance from nose to shoulder line (normalized)
-  - torso:         Torso length normalized by shoulder width
+  - forward:          How far the nose is from the shoulder center (normalized)
+  - slope:            How tilted the shoulders are (left vs right)
+  - tilt:             How much the head is tilted sideways (ear alignment)
+  - nose_shoulder:    Perpendicular distance from nose to shoulder line (normalized)
+  - shoulder_y_left:  Raw Y-coordinate of the left shoulder (for spine drop detection)
+  - shoulder_y_right: Raw Y-coordinate of the right shoulder (for spine drop detection)
 """
 
 import math
@@ -54,34 +55,31 @@ def nose_to_shoulder_dist(nose, ls, rs):
 
 def compute_metrics(pts):
     """
-    Compute all five posture metrics from landmark points.
+    Compute all posture metrics from landmark points.
 
     Args:
         pts: dict with keys 'nose', 'ls', 'rs', 'le', 're', 'lh', 'rh',
              each being an (x, y) tuple in pixel coordinates.
 
     Returns:
-        dict with keys: 'forward', 'slope', 'tilt', 'nose_shoulder', 'torso'
+        dict with keys: 'forward', 'slope', 'tilt', 'nose_shoulder',
+                         'shoulder_y_left', 'shoulder_y_right'
     """
     nose = pts['nose']
     ls, rs = pts['ls'], pts['rs']
     le, re = pts['le'], pts['re']
-    lh, rh = pts['lh'], pts['rh']
 
     # Shoulder width (used for normalization)
     sw = distance(ls, rs)
 
-    # Shoulder center and hip center
+    # Shoulder center
     sc = (int((ls[0] + rs[0]) / 2), int((ls[1] + rs[1]) / 2))
-    hc = (int((lh[0] + rh[0]) / 2), int((lh[1] + rh[1]) / 2))
-
-    # Torso length normalized by shoulder width
-    torso_len = distance(sc, hc) / sw
 
     return {
-        'forward':       distance(nose, sc) / sw,
-        'slope':         shoulder_slope(ls, rs),
-        'tilt':          head_tilt(le, re),
-        'nose_shoulder': nose_to_shoulder_dist(nose, ls, rs),
-        'torso':         torso_len,
+        'forward':          distance(nose, sc) / sw,
+        'slope':            shoulder_slope(ls, rs),
+        'tilt':             head_tilt(le, re),
+        'nose_shoulder':    nose_to_shoulder_dist(nose, ls, rs),
+        'shoulder_y_left':  ls[1],
+        'shoulder_y_right': rs[1],
     }

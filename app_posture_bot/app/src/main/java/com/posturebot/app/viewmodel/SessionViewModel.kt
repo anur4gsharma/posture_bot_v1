@@ -21,7 +21,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -33,6 +32,8 @@ import java.util.UUID
  * The Python backend handles all webcam + MediaPipe processing.
  * This ViewModel receives posture state/metrics over WebSocket
  * and manages the Android-side UI state, session storage, and haptic feedback.
+ *
+ * Flow: Welcome (Connect) → Live (Start Calibration) → Monitoring → Stop → Report → Home
  */
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -59,7 +60,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _calibrationProgress = MutableStateFlow(0f)
     val calibrationProgress: StateFlow<Float> = _calibrationProgress.asStateFlow()
 
-    // Live metrics for display (forward, slope, tilt, nose_shoulder, torso)
+    // Live metrics for display (forward, slope, tilt, nose_shoulder, shoulder Y values)
     private val _metricsText = MutableStateFlow<Map<String, Float>?>(null)
     val metricsText: StateFlow<Map<String, Float>?> = _metricsText.asStateFlow()
 
@@ -74,11 +75,21 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _bodyPartPercentages = MutableStateFlow<Map<String, Float>>(emptyMap())
     val bodyPartPercentages: StateFlow<Map<String, Float>> = _bodyPartPercentages.asStateFlow()
 
+    // ── Session report data ─────────────────────────────────────────
+    data class SessionReport(
+        val durationMs: Long,
+        val goodPercent: Float,
+        val totalAlerts: Int,
+        val bodyPartBreakdown: Map<String, Float>
+    )
+
+    private val _sessionReport = MutableStateFlow<SessionReport?>(null)
+    val sessionReport: StateFlow<SessionReport?> = _sessionReport.asStateFlow()
+
     // Internal counters: total frames and good frames per body part
-    private val bodyPartNames = listOf("Head Forward", "Shoulders", "Head Tilt", "Neck", "Spine")
+    private val bodyPartNames = listOf("Shoulders", "Head Tilt", "Neck", "Spine")
     // Maps issue string from backend → body part display name
     private val issueToBodyPart = mapOf(
-        "FORWARD HEAD" to "Head Forward",
         "UNEVEN SHOULDERS" to "Shoulders",
         "HEAD TILT" to "Head Tilt",
         "SLOUCHING" to "Neck",
@@ -94,7 +105,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private var pipelineJob: Job? = null
     private var writeJob: Job? = null
     private var currentWsUrl: String = DEFAULT_WS_URL
-    private var calibrationCommandJob: Job? = null
+    private var sessionStartTime: Long = 0L
+    private var totalGoodFrames = 0
+    private var totalMonitoringFrames = 0
+    private var totalAlertCount = 0
 
     @Volatile private var lastState: PostureState = PostureState.Idle
     @Volatile private var lastUpdate: PostureUpdate? = null
@@ -106,32 +120,28 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Called when the user taps "Start Calibration" on the welcome screen.
-     * Connects to the Python backend and sends the calibration command
-     * once the WebSocket is actually connected.
+     * Called when the user taps "Connect" on the welcome screen.
+     * Connects to the Python backend only — does NOT start calibration.
      */
-    fun beginCalibration(wsUrl: String = DEFAULT_WS_URL) {
+    fun connectToBackend(wsUrl: String = DEFAULT_WS_URL) {
         currentWsUrl = wsUrl
         connect(wsUrl)
-        startSession()
-        // Wait for connection before sending the calibration command
-        calibrationCommandJob?.cancel()
-        calibrationCommandJob = viewModelScope.launch {
-            _connectionState.first { it == PostureStreamClient.ConnectionState.Connected }
-            streamClient?.sendCommand("START_CALIBRATION")
-            Log.i(TAG, "START_CALIBRATION sent after connection established")
-        }
+        startPipeline()
+        _stateFlow.value = PostureState.Idle
     }
 
     /**
-     * Called when the user taps "Start Calibration" on the live screen
-     * (already connected to the backend).
+     * Called when the user taps "Start Calibration" on the live screen.
+     * Sends the calibration command and starts a new session.
      */
     fun requestCalibration() {
         _stateFlow.value = PostureState.Calibrating
         _calibrationProgress.value = 0f
         // Reset body-part counters for new calibration
         bodyPartTotalFrames = 0
+        totalGoodFrames = 0
+        totalMonitoringFrames = 0
+        totalAlertCount = 0
         bodyPartBadFrames.keys.forEach { bodyPartBadFrames[it] = 0 }
         _bodyPartPercentages.value = emptyMap()
         // Start a new session if we don't have one
@@ -143,15 +153,35 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Called when the user taps "Stop Monitoring" on the live screen.
-     * Tells the Python backend to stop and ends the local session,
-     * but keeps the WebSocket connection alive for future commands.
+     * Called when the user taps "Stop Analyzing" on the live screen.
+     * Tells the Python backend to stop, finalizes the session, and
+     * generates a report for the report screen.
      */
-    fun stopMonitoring() {
+    fun stopAndShowReport() {
         streamClient?.sendCommand("STOP_MONITORING")
         // Cancel data pipelines
         pipelineJob?.cancel()
         writeJob?.cancel()
+
+        val durationMs = System.currentTimeMillis() - sessionStartTime
+        val goodPct = if (totalMonitoringFrames > 0)
+            100f * totalGoodFrames / totalMonitoringFrames else 0f
+
+        // Build the report
+        val breakdown = bodyPartNames.associateWith { part ->
+            val bad = bodyPartBadFrames[part] ?: 0
+            if (bodyPartTotalFrames > 0)
+                ((bodyPartTotalFrames - bad).toFloat() / bodyPartTotalFrames * 100f)
+            else 100f
+        }
+
+        _sessionReport.value = SessionReport(
+            durationMs = durationMs,
+            goodPercent = goodPct,
+            totalAlerts = totalAlertCount,
+            bodyPartBreakdown = breakdown
+        )
+
         // Finalize session in DB
         val sid = sessionId
         val dao = db
@@ -180,6 +210,42 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
+     * Called when the user taps "Go Back to Calibration" after retries exhausted,
+     * or "Return to Home" on the report screen.
+     * Fully disconnects WebSocket, clears all state, and resets to idle.
+     */
+    fun goBackToCalibration() {
+        streamClient?.disconnect()
+        streamClient = null
+        pipelineJob?.cancel()
+        writeJob?.cancel()
+        sessionId = null
+        _stateFlow.value = PostureState.Idle
+        _connectionState.value = PostureStreamClient.ConnectionState.Disconnected("Not started")
+        _calibrationProgress.value = 0f
+        _metricsText.value = null
+        _issuesFlow.value = emptyList()
+        _postureStateHistory.value = emptyList()
+        _bodyPartPercentages.value = emptyMap()
+        _sessionReport.value = null
+        bodyPartTotalFrames = 0
+        totalGoodFrames = 0
+        totalMonitoringFrames = 0
+        totalAlertCount = 0
+        bodyPartBadFrames.keys.forEach { bodyPartBadFrames[it] = 0 }
+        lastState = PostureState.Idle
+        lastUpdate = null
+        Log.i(TAG, "Fully reset — returning to calibration/welcome")
+    }
+
+    /**
+     * Clear the session report (used after navigating away from report screen).
+     */
+    fun clearReport() {
+        _sessionReport.value = null
+    }
+
+    /**
      * Reconnect to the Python backend after a disconnection.
      * Re-creates the WebSocket connection and restarts the data pipeline.
      */
@@ -204,13 +270,16 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun startSession() {
         val sid = UUID.randomUUID().toString()
         sessionId = sid
-        _stateFlow.value = PostureState.Calibrating
+        sessionStartTime = System.currentTimeMillis()
         lastState = PostureState.Calibrating
         _postureStateHistory.value = emptyList()
         _calibrationProgress.value = 0f
 
         // Reset body-part counters for new session
         bodyPartTotalFrames = 0
+        totalGoodFrames = 0
+        totalMonitoringFrames = 0
+        totalAlertCount = 0
         bodyPartBadFrames.keys.forEach { bodyPartBadFrames[it] = 0 }
         _bodyPartPercentages.value = emptyMap()
 
@@ -281,11 +350,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         // Update metrics for display
         update.metrics?.let { m ->
             _metricsText.value = mapOf(
-                "Forward head" to m.forward,
                 "Shoulder slope" to m.slope,
                 "Head tilt" to m.tilt,
                 "Nose-shoulder" to m.noseToShoulder,
-                "Torso length" to m.torso
+                "Shoulder L Y" to m.shoulderYLeft,
+                "Shoulder R Y" to m.shoulderYRight
             )
         }
 
@@ -322,6 +391,12 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         // Only track during active monitoring (GOOD, BAD, ALERT, WARNING)
         if (newState == PostureState.Good || newState == PostureState.Bad || newState == PostureState.Warning) {
             bodyPartTotalFrames++
+            totalMonitoringFrames++
+
+            if (newState == PostureState.Good) {
+                totalGoodFrames++
+            }
+
             // For each body part, check if its corresponding issue is present
             // If the issue is NOT present → that body part is good for this frame
             for ((issue, bodyPart) in issueToBodyPart) {
@@ -336,6 +411,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     ((bodyPartTotalFrames - bad).toFloat() / bodyPartTotalFrames * 100f)
                 }
             }
+        }
+
+        // Count alerts
+        if (update.state == "ALERT") {
+            totalAlertCount++
         }
 
         // Track state changes for history graph

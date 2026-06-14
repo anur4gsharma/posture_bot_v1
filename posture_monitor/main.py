@@ -74,13 +74,13 @@ def draw_monitoring_overlay(frame, result, w, h):
     cv2.rectangle(overlay, (0, 0), (w, banner_h), color, -1)
     cv2.addWeighted(overlay, 0.55, frame, 0.45, 0, frame)
     cv2.putText(frame, status_text, (20, 35),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
 
     # Issue details
     if result.issues:
         detail = " | ".join(result.issues)
         cv2.putText(frame, detail, (20, 65),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
     # Sliding window info bar (shows bad seconds / threshold)
     window_text = f"Bad: {result.bad_seconds_in_window:.0f}s / {config.BAD_POSTURE_THRESHOLD}s"
@@ -88,7 +88,7 @@ def draw_monitoring_overlay(frame, result, w, h):
     buzz_color = (0, 0, 255) if result.buzz_active else (0, 200, 0)
 
     cv2.putText(frame, window_text, (20, banner_h + 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
     cv2.putText(frame, buzz_label, (w - 150, banner_h + 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, buzz_color, 2)
 
@@ -102,17 +102,17 @@ def draw_monitoring_overlay(frame, result, w, h):
 
     # Metrics overlay (bottom-left)
     if result.metrics:
-        y_off = h - 140
+        y_off = h - 120
         lines = [
-            f"Forward: {result.metrics['forward']:.2f}",
             f"Slope:   {result.metrics['slope']:.2f}",
             f"Tilt:    {result.metrics['tilt']:.1f}",
             f"NoseSh:  {result.metrics['nose_shoulder']:.2f}",
-            f"Torso:   {result.metrics['torso']:.2f}",
+            f"ShdrL_Y: {result.metrics['shoulder_y_left']}",
+            f"ShdrR_Y: {result.metrics['shoulder_y_right']}",
         ]
         for i, line in enumerate(lines):
             cv2.putText(frame, line, (10, y_off + i * 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1)
 
 
 def draw_no_person(frame, w):

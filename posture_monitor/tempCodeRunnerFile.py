@@ -1,1 +1,0 @@
-python -m posture_monitor.main

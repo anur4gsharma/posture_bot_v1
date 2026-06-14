@@ -10,6 +10,11 @@ Buzzer Rule (sliding window):
   within the last 30 seconds. This prevents false alarms from brief
   movements or adjustments.
 
+Spine Check (shoulder Y-drop):
+  During calibration a horizontal baseline is established for each shoulder's
+  Y-coordinate. If either shoulder drops below its baseline by more than
+  SHOULDER_DROP_TOLERANCE pixels, "SPINE NOT STRAIGHT" is flagged.
+
 Usage:
     analyzer = PostureAnalyzer(baseline)
     result = analyzer.analyze(metrics)
@@ -41,10 +46,12 @@ class PostureAnalyzer:
         """
         Args:
             baseline: dict with keys 'forward', 'slope', 'tilt',
-                      'nose_shoulder', 'torso' — averaged from calibration.
+                      'nose_shoulder', 'shoulder_y_left', 'shoulder_y_right'
+                      — averaged from calibration.
         """
         self.baseline = baseline
         self.bad_frames = 0
+        # NOTE: 'forward' metric is no longer checked — it duplicates 'SLOUCHING'
 
         # Sliding window: deque of (timestamp, is_bad) entries
         # Used to calculate how many seconds of bad posture in the last 30s
@@ -53,12 +60,14 @@ class PostureAnalyzer:
 
         # Compute thresholds from baseline + config multipliers
         self.thresholds = {
-            'forward':       baseline['forward'] * config.FORWARD_MULTIPLIER,
             'slope':         baseline['slope'] + config.SLOPE_OFFSET,
             'tilt':          baseline['tilt'] + config.TILT_OFFSET,
             'nose_shoulder': baseline['nose_shoulder'] * config.NOSE_SHOULDER_MULTIPLIER,
-            'torso':         baseline['torso'] * config.TORSO_MULTIPLIER,
         }
+
+        # Store baseline shoulder Y positions for spine drop detection
+        self.baseline_shoulder_y_left = baseline['shoulder_y_left']
+        self.baseline_shoulder_y_right = baseline['shoulder_y_right']
 
     def _update_window(self, is_bad):
         """
@@ -107,15 +116,13 @@ class PostureAnalyzer:
 
         Args:
             metrics: dict from compute_metrics() with keys
-                     'forward', 'slope', 'tilt', 'nose_shoulder', 'torso'.
+                     'forward', 'slope', 'tilt', 'nose_shoulder',
+                     'shoulder_y_left', 'shoulder_y_right'.
 
         Returns:
             PostureResult with state, issues, bad frame count, and buzz status.
         """
         issues = []
-
-        if metrics['forward'] > self.thresholds['forward']:
-            issues.append("FORWARD HEAD")
 
         if metrics['slope'] > self.thresholds['slope']:
             issues.append("UNEVEN SHOULDERS")
@@ -126,7 +133,12 @@ class PostureAnalyzer:
         if metrics['nose_shoulder'] < self.thresholds['nose_shoulder']:
             issues.append("SLOUCHING")
 
-        if metrics['torso'] < self.thresholds['torso']:
+        # Spine check: if either shoulder drops below its calibrated
+        # Y-position by more than SHOULDER_DROP_TOLERANCE pixels
+        # (Y increases downward in image coordinates)
+        left_drop = metrics['shoulder_y_left'] - self.baseline_shoulder_y_left
+        right_drop = metrics['shoulder_y_right'] - self.baseline_shoulder_y_right
+        if left_drop > config.SHOULDER_DROP_TOLERANCE or right_drop > config.SHOULDER_DROP_TOLERANCE:
             issues.append("SPINE NOT STRAIGHT")
 
         is_bad = len(issues) > 0

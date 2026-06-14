@@ -29,11 +29,11 @@ class Calibrator:
         """
         self.duration = duration_seconds or config.CALIBRATION_SECONDS
         self._samples = {
-            'forward': [],
             'slope': [],
             'tilt': [],
             'nose_shoulder': [],
-            'torso': [],
+            'shoulder_y_left': [],
+            'shoulder_y_right': [],
         }
         self._start_time = None
 

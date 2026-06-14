@@ -38,9 +38,10 @@ fun LiveSessionScreen(
     postureStateHistory: List<Pair<Long, String>> = emptyList(),
     connectionState: PostureStreamClient.ConnectionState? = null,
     onFinishCalibration: (() -> Unit)? = null,
-    onStopMonitoring: (() -> Unit)? = null,
+    onStopAnalyzing: (() -> Unit)? = null,
     onStartCalibration: (() -> Unit)? = null,
     onReconnect: (() -> Unit)? = null,
+    onGoBackToCalibration: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -54,8 +55,28 @@ fun LiveSessionScreen(
             ConnectionStatusBar(connState)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Show Reconnect button when disconnected
-            if (connState is PostureStreamClient.ConnectionState.Disconnected) {
+            // Show "Go Back to Calibration" when retries exhausted
+            if (connState is PostureStreamClient.ConnectionState.RetriesExhausted) {
+                Button(
+                    onClick = { onGoBackToCalibration?.invoke() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        "Go Back to Calibration",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            // Show Reconnect button when disconnected (but not retries exhausted)
+            else if (connState is PostureStreamClient.ConnectionState.Disconnected) {
                 Button(
                     onClick = { onReconnect?.invoke() },
                     modifier = Modifier
@@ -208,11 +229,11 @@ fun LiveSessionScreen(
             }
         }
 
-        // ── Stop Monitoring button (only during active monitoring) ────
+        // ── Stop Analyzing button (only during active monitoring) ────
         if (state == PostureState.Good || state == PostureState.Bad || state == PostureState.Warning) {
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { onStopMonitoring?.invoke() },
+                onClick = { onStopAnalyzing?.invoke() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -221,7 +242,7 @@ fun LiveSessionScreen(
                 )
             ) {
                 Text(
-                    "Stop Monitoring",
+                    "Stop Analyzing",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
@@ -238,8 +259,12 @@ private fun ConnectionStatusBar(state: PostureStreamClient.ConnectionState) {
             "Connecting to laptop…" to MaterialTheme.colorScheme.tertiary
         PostureStreamClient.ConnectionState.Connected ->
             "Connected" to MaterialTheme.colorScheme.primary
+        is PostureStreamClient.ConnectionState.Reconnecting ->
+            "Reconnecting… (${state.attempt}/${state.maxAttempts})" to MaterialTheme.colorScheme.tertiary
         is PostureStreamClient.ConnectionState.Disconnected ->
             "Disconnected: ${state.reason}" to MaterialTheme.colorScheme.error
+        is PostureStreamClient.ConnectionState.RetriesExhausted ->
+            "Connection failed — all retries exhausted" to MaterialTheme.colorScheme.error
     }
     Text(
         text = "● $text",

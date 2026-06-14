@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun WelcomeScreen(
-    onStartCalibration: (serverUrl: String) -> Unit,
+    onConnect: (serverUrl: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -157,7 +157,7 @@ fun WelcomeScreen(
         Button(
             onClick = {
                 val url = "ws://${serverIp.trim()}:8765"
-                onStartCalibration(url)
+                onConnect(url)
             },
             modifier = Modifier
                 .fillMaxWidth(0.7f)
@@ -169,7 +169,7 @@ fun WelcomeScreen(
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
         ) {
             Text(
-                text = "Start Calibration",
+                text = "Connect",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White
@@ -179,7 +179,7 @@ fun WelcomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Sit with good posture before starting",
+            text = "Enter your laptop IP and connect",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
