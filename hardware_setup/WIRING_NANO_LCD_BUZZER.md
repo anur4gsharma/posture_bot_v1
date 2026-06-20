@@ -1,4 +1,4 @@
-# Wiring: Arduino Nano + LCD 16×2 I2C + Active Buzzer
+ # Wiring: Arduino Nano + LCD 16×2 I2C + Active Buzzer
 
 ## Components
 

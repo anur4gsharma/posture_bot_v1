@@ -1,39 +1,3 @@
-/*
- * Arduino Nano — LCD 16x2 + Active Buzzer Posture Controller
- * ============================================================
- * Receives posture status commands from the Python script
- * via USB Serial and drives:
- *   - 16x2 I2C LCD (address 0x27) — shows text messages
- *   - Active buzzer (digital pin D8) — beeps ONLY when BUZZ_ON received
- *
- * The buzzer is controlled independently from the display state.
- * Python sends BUZZ_ON only when bad posture >= 25s in the last 30s.
- *
- * Serial Protocol (9600 baud):
- *   "GOOD\n"      -> LCD: "  GOOD POSTURE  " / "   Keep it up!  "
- *   "BAD\n"       -> LCD: " BAD POSTURE!!! " / "Fix your posture!"
- *   "ALERT\n"     -> LCD: " BAD POSTURE!!! " / "Fix your posture!" (same as BAD)
- *   "SLEEP\n"     -> LCD: " NOT CONNECTED  " / "    Zzz...      "
- *   "CAL\n"       -> LCD: " CALIBRATING... " / " Sit straight!  "
- *   "READY\n"     -> LCD: "    READY!      " / "  Monitoring... "
- *   "OFF\n"       -> LCD: "  SYSTEM OFF    " / "                "
- *   "BUZZ_ON\n"   -> Start buzzer beeping pattern
- *   "BUZZ_OFF\n"  -> Stop buzzer immediately
- *
- * Wiring:
- *   LCD SDA  -> A4 (Nano)
- *   LCD SCL  -> A5 (Nano)
- *   LCD VCC  -> 5V
- *   LCD GND  -> GND
- *   Buzzer + -> D8
- *   Buzzer - -> GND
- *
- * Libraries: LiquidCrystal_I2C (install via Arduino Library Manager)
- *            Wire (built-in)
- *
- * Board: Arduino Nano (ATmega328P / ATmega328P Old Bootloader)
- */
-
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -51,10 +15,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 String currentCommand = "";
 String lastDisplayState = "";
 bool buzzerActive = false;
-bool buzzerState = false;        // Current on/off in beep cycle
+bool buzzerState = false;
 unsigned long lastBeepTime = 0;
 
-// Custom characters for LCD
+// ======================== CUSTOM CHARACTERS ========================
 byte heartChar[8] = {
   0b00000,
   0b01010,
@@ -108,21 +72,25 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // LCD init
-  lcd.init();
+  // LCD init — use begin() for correct hardware initialization
+  lcd.begin();           // FIX iter 2: was lcd.init()
   lcd.backlight();
+  lcd.noCursor();        // FIX iter 2: suppress blinking cursor artifact
+  lcd.noBlink();
 
-  // Create custom characters
+  // Create custom characters (must be done after begin())
   lcd.createChar(0, heartChar);
   lcd.createChar(1, skullChar);
   lcd.createChar(2, sleepChar);
   lcd.createChar(3, checkChar);
 
   // Show startup message
+  // FIX iter 1: all strings are exactly 16 chars (custom char counts as 1)
+  lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(" NOT CONNECTED  ");
+  lcd.print(" NOT CONNECTED  ");  // 16 chars
   lcd.setCursor(0, 1);
-  lcd.print("    Zzz...      ");
+  lcd.print("     Zzz...     ");  // 16 chars
 }
 
 
@@ -168,59 +136,63 @@ void processCommand(String cmd) {
   // --- Display commands (only update if changed) ---
   if (cmd == lastDisplayState) return;
 
-  if (cmd == "GOOD") {
-    lcd.setCursor(0, 0);
-    lcd.print(" GOOD POSTURE ");
-    lcd.write(byte(0));  // heart
-    lcd.print(" ");
-    lcd.setCursor(0, 1);
-    lcd.print("  Keep it up!   ");
+  // FIX iter 2: lcd.clear() before every write prevents ghost characters
+  // from previous longer strings bleeding into shorter new strings.
+  lcd.clear();
 
-    // Turn off buzzer when posture is good
+  if (cmd == "GOOD") {
+    // FIX iter 1: " GOOD POSTURE  " (15) + heart (1) = 16 total
+    lcd.setCursor(0, 0);
+    lcd.print(" GOOD POSTURE  ");  // 15 chars
+    lcd.write(byte(0));            // heart = 1 char → total 16
+    // FIX iter 1: "  Keep it up!   " = 16 chars
+    lcd.setCursor(0, 1);
+    lcd.print("  Keep it up!   "); // 16 chars
+
     buzzerActive = false;
     buzzerState = false;
     digitalWrite(BUZZER_PIN, LOW);
 
   } else if (cmd == "BAD" || cmd == "ALERT") {
+    // FIX iter 1: "BAD POSTURE!!! " (15) + skull (1) = 16 total
     lcd.setCursor(0, 0);
-    lcd.print(" BAD POSTURE! ");
-    lcd.write(byte(1));  // skull
-    lcd.print(" ");
+    lcd.print("BAD POSTURE!!! "); // 15 chars
+    lcd.write(byte(1));           // skull = 1 char → total 16
+    // FIX iter 1: "Fix your posture" = 16 chars (was "Fix ur posture! " with trailing space issues)
     lcd.setCursor(0, 1);
-    lcd.print("Fix ur posture! ");
+    lcd.print("Fix your posture"); // 16 chars
 
   } else if (cmd == "SLEEP" || cmd == "NONE") {
     lcd.setCursor(0, 0);
-    lcd.print(" NOT CONNECTED  ");
+    lcd.print(" NOT CONNECTED  ");  // 16 chars
     lcd.setCursor(0, 1);
-    lcd.print("    Zzz...      ");
+    lcd.print("     Zzz...     ");  // 16 chars
 
-    // Turn off buzzer when sleeping
     buzzerActive = false;
     buzzerState = false;
     digitalWrite(BUZZER_PIN, LOW);
 
   } else if (cmd == "CAL") {
     lcd.setCursor(0, 0);
-    lcd.print(" CALIBRATING... ");
+    lcd.print(" CALIBRATING... ");  // 16 chars
     lcd.setCursor(0, 1);
-    lcd.print(" Sit straight!  ");
+    lcd.print("  Sit straight! ");  // 16 chars
 
   } else if (cmd == "READY") {
+    // FIX iter 1: "    READY!    " (14) + check (1) + " " (1) = 16 total
     lcd.setCursor(0, 0);
-    lcd.print("    READY! ");
-    lcd.write(byte(3));  // check
-    lcd.print("    ");
+    lcd.print("    READY!    "); // 14 chars
+    lcd.write(byte(3));          // check = 1 char
+    lcd.print(" ");              // 1 char → total 16
     lcd.setCursor(0, 1);
-    lcd.print("  Monitoring... ");
+    lcd.print("  Monitoring... ");  // 16 chars
 
   } else if (cmd == "OFF") {
     lcd.setCursor(0, 0);
-    lcd.print("  SYSTEM OFF    ");
+    lcd.print("   SYSTEM OFF   ");  // 16 chars
     lcd.setCursor(0, 1);
-    lcd.print("                ");
+    lcd.print("                ");  // 16 spaces
 
-    // Turn off buzzer
     buzzerActive = false;
     buzzerState = false;
     digitalWrite(BUZZER_PIN, LOW);
@@ -238,14 +210,12 @@ void handleBuzzer() {
   unsigned long now = millis();
 
   if (buzzerState) {
-    // Currently beeping — check if on-time elapsed
     if (now - lastBeepTime >= BEEP_ON_MS) {
       digitalWrite(BUZZER_PIN, LOW);
       buzzerState = false;
       lastBeepTime = now;
     }
   } else {
-    // Currently silent — check if off-time elapsed
     if (now - lastBeepTime >= BEEP_OFF_MS) {
       digitalWrite(BUZZER_PIN, HIGH);
       buzzerState = true;

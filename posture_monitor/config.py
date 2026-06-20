@@ -20,7 +20,7 @@ SERIAL_PORT_UNO = "COM3"
 SERIAL_BAUD_UNO = 9600
 
 # Arduino Nano — LCD 16x2 + Buzzer
-SERIAL_PORT_NANO = "COM4"
+SERIAL_PORT_NANO = "COM7"
 SERIAL_BAUD_NANO = 9600
 
 # Set False to run without serial (display-only mode)

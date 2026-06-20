@@ -41,9 +41,7 @@
 #define COL_DARK_AMBER  0x4200
 #define COL_DARK_GRAY   0x2104
 #define COL_GRAY        0x7BEF
-#define COL_PINK        0xFBCF
-#define COL_SKIN        0xFDD0
-#define COL_DARK_SKIN   0xEB40
+
 
 // ======================== GLOBALS ========================
 MCUFRIEND_kbv tft;
@@ -115,24 +113,11 @@ void processCommand(String cmd) {
     drawReadyScreen();
   } else if (cmd == "OFF") {
     tft.fillScreen(COL_BLACK);
-    tft.setTextColor(COL_DARK_GRAY);
-    tft.setTextSize(2);
-    printCentered("System OFF", CENTER_X, CENTER_Y);
   }
 
   lastStatus = cmd;
 }
 
-
-// ======================== HELPER: Centered text ========================
-
-void printCentered(const char* text, int x, int y) {
-  int16_t x1, y1;
-  uint16_t tw, th;
-  tft.getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
-  tft.setCursor(x - tw / 2, y - th / 2);
-  tft.print(text);
-}
 
 
 // ======================== HAPPY FACE (Good Posture) ========================
@@ -172,17 +157,6 @@ void drawHappyFace() {
     tft.drawPixel(cx + i, y + 2, COL_BLACK);
   }
 
-  // Rosy cheeks — cute blush just below outer edge of eyes
-  int blushY = eyeY + eyeR + 8;
-  tft.fillCircle(cx - eyeSpacing, blushY, 7, COL_PINK);
-  tft.fillCircle(cx + eyeSpacing, blushY, 7, COL_PINK);
-
-  // Status text
-  tft.setTextColor(COL_WHITE);
-  tft.setTextSize(3);
-  printCentered("GOOD", CENTER_X, SCREEN_H - 40);
-  tft.setTextSize(2);
-  printCentered("POSTURE", CENTER_X, SCREEN_H - 15);
 }
 
 
@@ -239,13 +213,6 @@ void drawScaredFace() {
                    cx + eyeSpacing + eyeR + 3, eyeY - 4,
                    cx + eyeSpacing + eyeR + 7, eyeY - 4, COL_CYAN);
 
-  // Status text
-  tft.setTextColor(COL_YELLOW);
-  tft.setTextSize(2);
-  printCentered("FIX YOUR", CENTER_X, SCREEN_H - 40);
-  tft.setTextColor(COL_WHITE);
-  tft.setTextSize(3);
-  printCentered("POSTURE!", CENTER_X, SCREEN_H - 12);
 }
 
 
@@ -286,26 +253,10 @@ void drawSleepingFace() {
   tft.drawLine(cx - r / 6, mouthY, cx + r / 6, mouthY, COL_BLACK);
   tft.drawLine(cx - r / 6, mouthY + 1, cx + r / 6, mouthY + 1, COL_BLACK);
 
-  // "Zzz" text — cascading, getting larger
-  tft.setTextColor(COL_WHITE);
-
-  tft.setTextSize(1);
-  tft.setCursor(cx + r - 5, cy - r + 5);
-  tft.print("z");
-
-  tft.setTextSize(2);
-  tft.setCursor(cx + r + 5, cy - r - 10);
-  tft.print("z");
-
-  tft.setTextSize(3);
-  tft.setCursor(cx + r + 15, cy - r - 30);
-  tft.print("Z");
-
-  // Status text
-  tft.setTextColor(COL_GRAY);
-  tft.setTextSize(2);
-  printCentered("NOT", CENTER_X, SCREEN_H - 40);
-  printCentered("CONNECTED", CENTER_X, SCREEN_H - 15);
+  // "Zzz" bubbles — drawn as small circles (no text)
+  tft.fillCircle(cx + r + 2, cy - r + 8, 4, COL_WHITE);
+  tft.fillCircle(cx + r + 14, cy - r - 8, 6, COL_WHITE);
+  tft.fillCircle(cx + r + 28, cy - r - 28, 9, COL_WHITE);
 }
 
 
@@ -334,13 +285,6 @@ void drawCalibrationScreen() {
   tft.fillCircle(cx, cy - 10, 8, COL_WHITE);             // Head
   tft.fillRoundRect(cx - 10, cy + 2, 20, 18, 4, COL_WHITE);  // Body
 
-  // Text
-  tft.setTextColor(COL_CYAN);
-  tft.setTextSize(2);
-  printCentered("CALIBRATING", CENTER_X, SCREEN_H - 40);
-  tft.setTextColor(COL_WHITE);
-  tft.setTextSize(1);
-  printCentered("Sit straight & still!", CENTER_X, SCREEN_H - 15);
 }
 
 
@@ -349,9 +293,25 @@ void drawCalibrationScreen() {
 void drawReadyScreen() {
   tft.fillScreen(COL_DARK_GREEN);
 
-  tft.setTextColor(COL_WHITE);
-  tft.setTextSize(3);
-  printCentered("READY!", CENTER_X, CENTER_Y - 10);
-  tft.setTextSize(2);
-  printCentered("Monitoring...", CENTER_X, CENTER_Y + 25);
+  int cx = CENTER_X;
+  int cy = CENTER_Y;
+  int r  = FACE_R;
+
+  // Large checkmark icon
+  tft.fillCircle(cx, cy, r, COL_GREEN);
+  tft.drawCircle(cx, cy, r, COL_WHITE);
+  tft.drawCircle(cx, cy, r + 1, COL_WHITE);
+
+  // Draw thick checkmark
+  int startX = cx - r / 3;
+  int midX   = cx - r / 8;
+  int endX   = cx + r / 3;
+  int startY = cy;
+  int midY   = cy + r / 4;
+  int endY   = cy - r / 3;
+
+  for (int t = -2; t <= 2; t++) {
+    tft.drawLine(startX, startY + t, midX, midY + t, COL_WHITE);
+    tft.drawLine(midX, midY + t, endX, endY + t, COL_WHITE);
+  }
 }
